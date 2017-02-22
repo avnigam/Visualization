@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Visualization Lab 1</title>
+    <meta name="description" content="Visualization Lab 1"/>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8"/>
+    <link rel="stylesheet" type="text/css" href="style.css" title="style"/>
+    <script src="https://d3js.org/d3.v4.min.js"></script>
+    <style>
+        .arc text {
+            font: 10px sans-serif;
+            text-anchor: middle;
+        }
+
+        .arc path {
+            stroke: #fff;
+        }
+
+        .links line {
+            stroke: #999;
+            stroke-opacity: 0.6;
+        }
+
+        .nodes circle {
+            stroke: #fff;
+            stroke-width: 1.5px;
+        }
+		
+        select {
+            width: 175px;
+            font-size: 10px;
+            height: 27px;
+            font: normal 100% 'century gothic', arial, sans-serif;
+            font-weight: bold;
+            background: #f9f9f9;
+        }
+
+		option { 
+			font-size: 10px;
+            font: normal 100% 'century gothic', arial, sans-serif;
+            font-weight: bold;
+			background-color: #f9f9f9;
+		}
+
+    </style>
+</head>
+<body>
+
+<div id="main">
+    <div style="height:125px" id="header">
+        <div id="logo">
+            <div id="logo_text">
+                <!-- class="logo_colour", allows you to change the colour of the text -->
+                <h1>IMDB Movie Data Visualization</h1>
+            </div>
+        </div>
+        <br>
+        <div style="width:850px; margin:0 auto; display: table;">
+            <div style="display: table-row">
+                <div style="width: 300px; margin:0 auto; display: table-cell;">
+                    <label><input type="checkbox" id="cbox1" value="first_checkbox"> Click for Force Directed Layout</label><br>
+                </div>
+                <div style="display: table-cell;">
+                    <label>Choose Data Variable </label>
+                    <select id="type">
+                        <option value="reviews">Total IMDB Ratings</option>
+                        <option value="likes">Total IMDB Reviews</option>
+                        <option value="shares">Total FB Likes for Movie</option>
+                        <option value="comments">Total FB Likes for Cast</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div id="bar" style="width:1000px; margin:0 auto;"></div>
+        <div id="chart" style="width:800px; margin:0 auto;"></div>
+        <div id="forcedirected" style="width:1000px; margin:0 auto;"></div>
+    </div>
+
+    <script>
+
+
+        function activateBinWidth() {
+
+            d3.select("#bar").on("mousedown", function () {
+
+                var div = d3.select(this)
+                        .classed("active", true);
+
+                var xPos = d3.mouse(div.node())[0]
+                var w = d3.select(window)
+                        .on("mousemove", mousemove)
+                        .on("mouseup", function () {
+                            div.classed("active", false);
+                            w.on("mousemove", null).on("mouseup", null);
+                        });
+
+                function mousemove() {
+                    if (d3.mouse(div.node())[0] + 20 < xPos && binWidth > 2) {
+                        binWidth -= 1;
+                        xPos = d3.mouse(div.node())[0];
+                    }
+                    else if (d3.mouse(div.node())[0] - 20 > xPos && binWidth < 8) {
+                        binWidth += 1;
+                        xPos = d3.mouse(div.node())[0];
+                    }
+                    refillDataHistogram(array, binWidth);
+                }
+            });
+        }
+
+        function activateBinWidthPie() {
+
+            d3.select("#chart").on("mousedown", function () {
+
+                var div = d3.select(this)
+                        .classed("active", true);
+
+                var xPos = d3.mouse(div.node())[0]
+                var w = d3.select(window)
+                        .on("mousemove", mousemove)
+                        .on("mouseup", function () {
+                            div.classed("active", false);
+                            w.on("mousemove", null).on("mouseup", null);
+                        });
+
+                function mousemove() {
+                    if (d3.mouse(div.node())[0] + 20 < xPos && binWidth > 2) {
+                        binWidth -= 1;
+                        xPos = d3.mouse(div.node())[0];
+                    }
+                    else if (d3.mouse(div.node())[0] - 20 > xPos && binWidth < 8) {
+                        binWidth += 1;
+                        xPos = d3.mouse(div.node())[0];
+                    }
+                    refillDataHistogram(array, binWidth);
+                }
+            });
+        }
+
+        var barPadding = 20, current = 0;
+
+        var array = []
+
+        var array1 = [];
+        var array2 = [];
+        var array3 = [];
+        var array4 = [];
+        var binWidth = 5;
+
+        d3.csv("data.csv", function (data) {
+            data.forEach(function (d) {
+                array1.push((d.reviews));
+                array2.push((d.ratings));
+                array3.push((d.movie_likes));
+                array4.push((d.cast_likes));
+            })
+            array = array1;
+            refillDataHistogram(array, binWidth);
+        });
+
+        document.getElementById("cbox1").onchange = function () {
+            var choice = document.getElementById("cbox1").checked;
+            console.log(choice);
+            if (choice == true) {
+                setNewLength();
+            } else {
+                document.getElementById("forcedirected").innerHTML = '';
+                refillDataHistogram(array, binWidth);
+            }
+        };
+
+        function setNewLength() {
+            document.getElementById("bar").innerHTML = ''
+            document.getElementById("chart").innerHTML = ''
+            activateForcedirected();
+        }
+
+
+        function activateForcedirected() {
+            var width = 960,
+                    height = 500,
+                    radius = 200;
+
+            var graph = {
+                nodes: [
+                    {"id": "1", "group": 1},
+                    {"id": "2", "group": 1},
+                    {"id": "3", "group": 1},
+                    {"id": "4", "group": 1},
+                    {"id": "5", "group": 1},
+                    {"id": "6", "group": 2},
+                    {"id": "7", "group": 2},
+                    {"id": "8", "group": 2},
+                    {"id": "9", "group": 2},
+                    {"id": "10", "group": 4},
+                    {"id": "11", "group": 4},
+                    {"id": "12", "group": 4},
+                    {"id": "13", "group": 4},
+                    {"id": "14", "group": 3},
+                    {"id": "15", "group": 3},
+                    {"id": "16", "group": 3},
+                    {"id": "17", "group": 3},
+                    {"id": "18", "group": 3},
+                    {"id": "19", "group": 4},
+                    {"id": "20", "group": 4},
+                ],
+                links: [
+                    {"source": "3", "target": "13"},
+                    {"source": "3", "target": "17"},
+                    {"source": "12", "target": "1"},
+                    {"source": "13", "target": "1"},
+                    {"source": "13", "target": "2"},
+                    {"source": "14", "target": "1"},
+                    {"source": "15", "target": "1"},
+                    {"source": "16", "target": "2"},
+                    {"source": "2", "target": "19"},
+                    {"source": "3", "target": "20"},
+                    {"source": "3", "target": "2"},
+                    {"source": "8", "target": "7"},
+                    {"source": "6", "target": "5"},
+                    {"source": "9", "target": "10"},
+                    {"source": "11", "target": "12"},
+                    {"source": "13", "target": "14"},
+                    {"source": "15", "target": "16"},
+                    {"source": "17", "target": "18"},
+                    {"source": "10", "target": "14"},
+                    {"source": "15", "target": "8"},
+                    {"source": "5", "target": "2"},
+                    {"source": "2", "target": "1"},
+                    {"source": "4", "target": "3"}
+                ]
+            };
+
+            var svg = d3.select("#forcedirected")
+                    .append("svg")
+                    .attr("width", width)
+                    .attr("height", height);
+
+            var color = d3.scaleOrdinal(d3.schemeCategory10);
+            var simulation = d3.forceSimulation()
+                    .force("link", d3.forceLink().id(function (d) {
+                        return d.id;
+                    }))
+                    .force("charge", d3.forceManyBody())
+                    .force("center", d3.forceCenter(width / 2, height / 2));
+
+            var link = svg.append("g")
+                    .attr("class", "links")
+                    .selectAll("line")
+                    .data(graph.links)
+                    .enter().append("line")
+                    .attr("stroke-width", function (d) {
+                        return Math.sqrt(d.value);
+                    });
+            var node = svg.append("g")
+                    .attr("class", "nodes")
+                    .selectAll("circle")
+                    .data(graph.nodes)
+                    .enter().append("circle")
+                    .attr("r", 7)
+                    .attr("fill", function (d) {
+                        return color(d.group);
+                    })
+                    .call(d3.drag()
+                            .on("start", dragstarted)
+                            .on("drag", dragged)
+                            .on("end", dragended));
+            node.append("title")
+                    .text(function (d) {
+                        return d.id;
+                    });
+            simulation
+                    .nodes(graph.nodes)
+                    .on("tick", ticked);
+            simulation.force("link")
+                    .links(graph.links);
+            function ticked() {
+                link
+                        .attr("x1", function (d) {
+                            return d.source.x;
+                        })
+                        .attr("y1", function (d) {
+                            return d.source.y;
+                        })
+                        .attr("x2", function (d) {
+                            return d.target.x;
+                        })
+                        .attr("y2", function (d) {
+                            return d.target.y;
+                        });
+                node
+                        .attr("cx", function (d) {
+                            return d.x;
+                        })
+                        .attr("cy", function (d) {
+                            return d.y;
+                        });
+            }
+
+            function dragstarted(d) {
+                if (!d3.event.active) simulation.alphaTarget(0.3).restart();
+                d.fx = d.x;
+                d.fy = d.y;
+            }
+
+            function dragged(d) {
+                d.fx = d3.event.x;
+                d.fy = d3.event.y;
+            }
+
+            function dragended(d) {
+                if (!d3.event.active) simulation.alphaTarget(0);
+                d.fx = null;
+                d.fy = null;
+            }
+
+        }
+        ;
+
+
+        document.getElementById("type").onchange = function () {
+            var choice = document.getElementById("type").value;
+            if (choice == "reviews") {
+                array = array1;
+            }
+            if (choice == "likes") {
+                array = array2;
+            }
+            if (choice == "shares") {
+                array = array3;
+            }
+            if (choice == "comments") {
+                array = array4;
+            }
+            refillDataHistogram(array, binWidth);
+        };
+
+        function createHistogram(data) {
+            var width = 960,
+                    height = 500,
+                    radius = 200;
+
+            console.log(data)
+            var svg = d3.select("#bar")
+                    .append("svg")
+                    .attr("width", width)
+                    .attr("height", height);
+            margin = {top: 100, right: 50, bottom: 50, left: 100},
+                    width = svg.attr("width") - margin.left - margin.right,
+                    height = svg.attr("height") - margin.top - margin.bottom;
+
+            console.log(width);
+            var x = d3.scaleLinear().rangeRound([0, width]);
+            var y = d3.scaleLinear().rangeRound([height, 0]);
+
+            var g = svg.append("g")
+                    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+            var scaleHeight = (0.9 * height / d3.max(data));
+
+            x.domain([0, getMaxOfArray()]);
+            y.domain([0, d3.max(data, function (d) {
+                return d * 1.1;
+            })]);
+
+            function getMaxOfArray() {
+                return Math.max.apply(null, array);
+            }
+
+            var text = g.selectAll(".bartext")
+                    .data(data)
+                    .enter()
+                    .append("text")
+                    .attr("class", "bartext")
+                    .attr("text-anchor", "middle")
+                    .attr("fill", "black")
+                    .attr("font-weight", "bold")
+                    .attr("x", function (d, i) {
+                        return i * (width / data.length) + (width / data.length - barPadding) / 2;
+                    })
+                    .attr("y", function (d) {
+                        return ((height - (d * scaleHeight)) - 25);
+                    })
+                    .text(function (d) {
+                        return d;
+                    })
+                    .attr("opacity", 0)
+
+            g.selectAll(".text")
+                    .data(data)
+                    .enter()
+                    .append("text")
+                    .attr("class", "bartext")
+                    .attr("text-anchor", "middle")
+                    .attr("fill", "black")
+                    .attr("font-weight", "bold")
+                    .attr("x", function (d, i) {
+                        return i * (width / data.length) + (width / data.length - barPadding) / 2;
+                    })
+                    .attr("y", height + 25)
+                    .text(function (d, i) {
+                        console.log(i);
+
+                        return (i) * Math.floor(getMaxOfArray() / binWidth) + " - " + (i + 1) * Math.floor(getMaxOfArray() / binWidth);
+                    })
+                    .attr("opacity", 100)
+
+            g.append("g")
+                    .attr("class", "axis axis--x")
+                    .attr("transform", "translate(0," + height + ")")
+                    .call(d3.axisBottom(x).ticks(0));
+
+            g.append("g")
+                    .attr("class", "axis axis--y")
+                    .call(d3.axisLeft(y).ticks(11))
+                    .append("text")
+                    .attr("transform", "rotate(-90)")
+                    .attr("y", 0)
+                    .attr("text-anchor", "end")
+                    .text("Frequency");
+
+            g.selectAll(".bar")
+                    .data(data)
+                    .enter()
+                    .append("rect")
+                    .attr("x", function (d, i) {
+                        return i * (width / data.length);
+                    })
+                    .attr("width", width / data.length - barPadding)
+                    .attr("y", function (d) {
+                        return parseInt(height - (d * scaleHeight)) + 0.5;
+                    })
+                    .attr("height", function (d) {
+                        return d * scaleHeight;
+                    })
+                    .attr("transform", "translate(10,0)")
+                    .attr('fill', 'blue')
+                    .on("mouseover", function (d, i) {
+                        d3.select(this)
+                                .attr("y", parseInt(height - (d * scaleHeight)) - 14.5)
+                                .attr("height", (d * scaleHeight) + 15)
+                                .attr("x", i * (width / data.length) - 5)
+                                .attr("width", width / data.length - barPadding + 10)
+                                .attr('fill', 'green')
+
+                        d3.selectAll("text")
+                                .select(function (d, ind) {
+                                    return ind === i ? this : null;
+                                })
+                                .style("opacity", 100)
+
+                    })
+                    .on("mouseout", function (d, i) {
+                        d3.select(this)
+                                .attr("width", width / data.length - barPadding)
+                                .attr("y", parseInt(height - (d * scaleHeight)) + 0.5)
+                                .attr("x", i * (width / data.length))
+                                .attr("height", (d * scaleHeight))
+                                .attr('fill', 'blue	')
+
+                        d3.selectAll("text")
+                                .select(function (d, ind) {
+                                    return ind === i ? this : null;
+                                })
+                                .style("opacity", 0)
+                    })
+
+                    .on("dblclick", function () {
+                        current = 1;
+                        document.getElementById("bar").innerHTML = '';
+                        createPieChart(data);
+                    });
+        }
+
+        function refillDataHistogram(array, bin) {
+            var widthBin = (d3.max(array) - d3.min(array)) / bin;
+
+            dataS = new Array(bin + 2).join('0').split('');
+            array.forEach(function (d) {
+                dataS[Math.floor((d - d3.min(array)) / widthBin)]++;
+            })
+            if (current == 0) {
+                document.getElementById("bar").innerHTML = '';
+                createHistogram(dataS);
+            } else {
+                document.getElementById("chart").innerHTML = '';
+                createPieChart(dataS);
+            }
+        }
+
+
+        function createPieChart(data) {
+            var color = d3.scaleOrdinal(d3.schemeCategory10);
+
+            var width = 960,
+                    height = 500,
+                    radius = 200;
+
+            var svg = d3.select("#chart")
+                    .append("svg")
+                    .attr("width", width)
+                    .attr("height", height)
+                    .append('g')
+                    .attr('transform', 'translate(' + 1.3 * radius + ',' + 1.3 * radius + ')');
+            ;
+
+            var arc = d3.arc()
+                    .outerRadius(radius - 10)
+                    .innerRadius(0);
+
+            var arc2 = d3.arc()
+                    .innerRadius(0)
+                    .outerRadius(radius + 20);
+
+            var pie = d3.pie()
+                    .sort(null)
+                    .value(function (d) {
+                        return d;
+                    });
+
+            var g = svg.selectAll(".arc")
+                    .data(pie(data))
+                    .enter().append("g")
+                    .attr("class", "arc");
+
+            g.append("path")
+                    .attr("d", arc)
+                    .attr('fill', function (d, i) {
+                        return color(i);
+                    })
+                    .on("mouseover", function (d, i) {
+                        d3.select(this)
+                                .attr("stroke", "black")
+                                .attr("d", arc2)
+                                .attr("stroke-width", 2);
+
+                        svg.append("text")
+                                .attr("transform", function () {
+                                    return "translate(" + arc.centroid(d) + ")";
+                                })
+                                .style("text-anchor", "middle")
+                                .style("font-size", 15)
+                                .attr("font-weight", "bold")
+                                .attr("class", "label")
+                                .style("opacity", 100)
+                                .text(d.value);
+
+                    })
+                    .on("mouseout", function (d, i) {
+                        d3.select(this)
+                                .attr("d", arc)
+                                .attr("stroke", "none");
+                        svg.selectAll("text")
+                                .style("opacity", 0);
+                    })
+                    .on("dblclick", function () {
+                        current = 0;
+                        document.getElementById("chart").innerHTML = '';
+                        createHistogram(data);
+                    });
+        }
+        activateBinWidth();
+        activateBinWidthPie();
+    </script>
+</body>
+</html>
